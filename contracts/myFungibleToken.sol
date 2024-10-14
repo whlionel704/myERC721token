@@ -9,24 +9,22 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 contract MyFungibleToken is ERC20, Ownable {
     uint256 public tokenPrice;  
     uint256 public icoStartTime;
-    uint256 public icoEndTime;
     uint256 public maxTokensForSale;
 
     bool public icoActive;
 
-    event ICOStarted(uint256 startTime, uint256 endTime);
+    event ICOStarted(uint256 startTime);
     event ICOEnded(uint256 endTime);
     event TokensPurchased(address indexed buyer, uint256 amount);
 
     constructor(address initialOwner, string memory name, string memory symbol, uint8 decimals) 
         ERC20(name, symbol) Ownable(initialOwner) {}
     
-    function startICO(uint256 _duration) public onlyOwner {
+    function startICO() public onlyOwner {
         require(!icoActive, "ICO already active");
         icoStartTime = block.timestamp;
-        icoEndTime = block.timestamp + _duration;
         icoActive = true;
-        emit ICOStarted(icoStartTime, icoEndTime);
+        emit ICOStarted(icoStartTime);
     }
 
     function endICO() public onlyOwner {
@@ -43,12 +41,11 @@ contract MyFungibleToken is ERC20, Ownable {
 
         // Buy tokens during the ICO
     function buyTokens() external payable {
+        require(icoActive, "ICO period has ended");
         require(msg.value > 0, "Send ETH to buy tokens");
         
         uint256 tokensToBuy = msg.value / tokenPrice;  // Calculate number of tokens
         require(tokensToBuy <= balanceOf(address(this)), "Not enough tokens available");
-
-        require(icoActive, "ICO period has ended");
 
         _transfer(address(this), msg.sender, tokensToBuy);  // Transfer tokens to buyer
         emit TokensPurchased(msg.sender, tokensToBuy);
