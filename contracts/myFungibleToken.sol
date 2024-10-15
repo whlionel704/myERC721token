@@ -3,22 +3,38 @@
 pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
 contract MyFungibleToken is ERC20, Ownable {
     uint256 public tokenPrice;  
     uint256 public icoStartTime;
     uint256 public maxTokensForSale;
-
+    uint256 public targetAmount;
     bool public icoActive;
+
+    // Address where funds are collected
+    address public fundsWallet;
 
     event ICOStarted(uint256 startTime);
     event ICOEnded(uint256 endTime);
     event TokensPurchased(address indexed buyer, uint256 amount);
 
-    constructor(address initialOwner, string memory name, string memory symbol, uint8 decimals) 
-        ERC20(name, symbol) Ownable(initialOwner) {}
+    constructor(
+        address initialOwner, 
+        string memory name,
+        string memory symbol,
+        uint256 _initalSupply,
+        uint256 _tokenPrice,
+        uint256 _maxTokensForSale,
+        uint256 _targetAmount,
+        address _fundsWallet
+    ) ERC20(name, symbol) Ownable(initialOwner) {
+        _mint(address(this), _initalSupply);
+        tokenPrice = _tokenPrice;
+        maxTokensForSale = _maxTokensForSale;
+        targetAmount = _targetAmount;
+        fundsWallet = _fundsWallet;
+    }
     
     function startICO() public onlyOwner {
         require(!icoActive, "ICO already active");
@@ -39,7 +55,11 @@ contract MyFungibleToken is ERC20, Ownable {
         tokenPrice = _newPrice;
     }
 
-        // Buy tokens during the ICO
+    function setTargetAmount(uint _targetAmount) public onlyOwner {
+        targetAmount = _targetAmount;
+    }
+
+    // Buy tokens during the ICO
     function buyTokens() external payable {
         require(icoActive, "ICO period has ended");
         require(msg.value > 0, "Send ETH to buy tokens");
@@ -52,6 +72,12 @@ contract MyFungibleToken is ERC20, Ownable {
     }
 
     function mint(uint256 numTokens) public {
-        _mint(msg.sender, numTokens*10**18);
+        _mint(msg.sender, numTokens);
+    }
+
+    function withdraw(uint256 tokensToWithdraw) external payable onlyOwner{
+        require(tokensToWithdraw <= balanceOf(address(this)), "Not enough tokens available");
+        require(targetAmount <= tokensToWithdraw);
+        _transfer(address(this), fundsWallet, tokensToWithdraw);
     }
 }
