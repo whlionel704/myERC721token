@@ -9,7 +9,6 @@ contract MyFungibleToken is ERC20, Ownable {
     uint256 public tokenPrice;  
     uint256 public icoStartTime;
     uint256 public maxTokensForSale;
-    uint256 public targetAmount;
     bool public icoActive;
 
     // Address where funds are collected
@@ -24,15 +23,11 @@ contract MyFungibleToken is ERC20, Ownable {
         string memory name,
         string memory symbol,
         uint256 _initalSupply,
-        uint256 _tokenPrice,
         uint256 _maxTokensForSale,
-        uint256 _targetAmount,
         address _fundsWallet
     ) ERC20(name, symbol) Ownable(initialOwner) {
         _mint(address(this), _initalSupply);
-        tokenPrice = _tokenPrice;
         maxTokensForSale = _maxTokensForSale;
-        targetAmount = _targetAmount;
         fundsWallet = _fundsWallet;
     }
     
@@ -55,16 +50,14 @@ contract MyFungibleToken is ERC20, Ownable {
         tokenPrice = _newPrice;
     }
 
-    function setTargetAmount(uint _targetAmount) public onlyOwner {
-        targetAmount = _targetAmount;
-    }
+    // function setTargetAmount(uint256 _targetAmount) public onlyOwner {
+    //     require(_targetAmount > 0, "target amount should be greater than 0");
+    //     targetAmount = _targetAmount;
+    // }
 
     // Buy tokens during the ICO
-    function buyTokens() external payable {
+    function buyTokens(uint256 tokensToBuy) external payable {
         require(icoActive, "ICO period has ended");
-        require(msg.value > 0, "Send ETH to buy tokens");
-        
-        uint256 tokensToBuy = msg.value / tokenPrice;  // Calculate number of tokens
         require(tokensToBuy <= balanceOf(address(this)), "Not enough tokens available");
 
         _transfer(address(this), msg.sender, tokensToBuy);  // Transfer tokens to buyer
@@ -75,9 +68,9 @@ contract MyFungibleToken is ERC20, Ownable {
         _mint(msg.sender, numTokens);
     }
 
-    function withdraw(uint256 tokensToWithdraw) external payable onlyOwner{
+    function withdraw(uint256 tokensToWithdraw) external payable {
+        require(msg.sender == address(fundsWallet), "Only fundsWallet account can withdraw");
         require(tokensToWithdraw <= balanceOf(address(this)), "Not enough tokens available");
-        require(targetAmount <= tokensToWithdraw);
         _transfer(address(this), fundsWallet, tokensToWithdraw);
     }
 }
