@@ -9,10 +9,14 @@ contract MyFungibleToken is ERC20, Ownable {
     uint256 public tokenPrice;  
     uint256 public icoStartTime;
     uint256 public maxTokensForSale;
+    uint256 public targetAmount;
     bool public icoActive;
 
     // Address where funds are collected
     address public fundsWallet;
+
+    //Variable to track total token balance in the contract
+    uint256 public tokenBalance;
 
     event ICOStarted(uint256 startTime);
     event ICOEnded(uint256 endTime);
@@ -23,11 +27,12 @@ contract MyFungibleToken is ERC20, Ownable {
         string memory name,
         string memory symbol,
         uint256 _initalSupply,
-        uint256 _maxTokensForSale,
+        uint256 _targetAmount,
         address _fundsWallet
     ) ERC20(name, symbol) Ownable(initialOwner) {
         _mint(address(this), _initalSupply);
-        maxTokensForSale = _maxTokensForSale;
+        tokenBalance = _initalSupply;
+        targetAmount = _targetAmount;
         fundsWallet = _fundsWallet;
     }
     
@@ -50,16 +55,20 @@ contract MyFungibleToken is ERC20, Ownable {
         tokenPrice = _newPrice;
     }
 
-    // function setTargetAmount(uint256 _targetAmount) public onlyOwner {
-    //     require(_targetAmount > 0, "target amount should be greater than 0");
-    //     targetAmount = _targetAmount;
-    // }
+    function setTargetAmount(uint256 _targetAmount) public onlyOwner {
+        require(_targetAmount > 0, "target amount should be greater than 0");
+        targetAmount = _targetAmount;
+    }
 
     // Buy tokens during the ICO
     function buyTokens(uint256 tokensToBuy) external payable {
         require(icoActive, "ICO period has ended");
-        require(tokensToBuy <= balanceOf(address(this)), "Not enough tokens available");
+        require(tokensToBuy <= tokenBalance, "Not enough tokens available");
+        uint256 ethersRequired = (tokensToBuy * 0.1 ether) / 100;
+        require(msg.value >= ethersRequired, "Not enough ether sent");
 
+        //token balance should be updated before transfer to avoid re-entrancy
+        tokenBalance -= tokensToBuy;
         _transfer(address(this), msg.sender, tokensToBuy);  // Transfer tokens to buyer
         emit TokensPurchased(msg.sender, tokensToBuy);
     }
@@ -68,9 +77,13 @@ contract MyFungibleToken is ERC20, Ownable {
         _mint(msg.sender, numTokens);
     }
 
-    function withdraw(uint256 tokensToWithdraw) external payable {
+
+    function withdrawEthers() external payable {
         require(msg.sender == address(fundsWallet), "Only fundsWallet account can withdraw");
-        require(tokensToWithdraw <= balanceOf(address(this)), "Not enough tokens available");
-        _transfer(address(this), fundsWallet, tokensToWithdraw);
+        require(address(this).balance > targetAmount, "No ether to withdraw");
+
+        // Transfer all ethers to fundsWallet
+        (bool success, ) = fundsWallet.call{value: address(this).balance}("");
+        require(success, "Ether transfer failed");
     }
 }
